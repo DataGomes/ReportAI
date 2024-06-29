@@ -1,0 +1,9 @@
+pandas
+numpy
+nltk
+pybliometrics
+markdown2
+weasyprint
+python-dotenv
+together
+voyageai
