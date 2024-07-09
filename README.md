@@ -7,7 +7,7 @@ This library generates reports based on scientific literature queries using Scop
 You can install the Report Generator directly from GitHub:
 
 ```
-pip install git+https://github.com/DataGomes/ReportGPT
+pip install git+https://github.com/DataGomes/ReportAI
 
 ## API Keys
 
