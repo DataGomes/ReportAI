@@ -43,6 +43,20 @@ class ReportGenerator:
         self.vo = voyageai.Client()
         self.together_client = Together()
 
+    def clean(self, text):
+        #remove @ppl, url
+        output = re.sub(r'https://\S*','', text)
+        output = re.sub(r'@\S*','',output)
+        
+        #remove \r, \n
+        rep = r'|'.join((r'\r',r'\n'))
+        output = re.sub(rep,'',output)
+        
+        #remove extra space
+        output = re.sub(r'\s+', ' ', output).strip()
+
+        return output
+
     def remove_punctuation(self, text: str) -> str:
         return text.translate(self.punctuation_translator)
 
