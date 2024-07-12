@@ -63,6 +63,19 @@ class ReportGenerator:
     def format_query(self, terms: List[str]) -> str:
         formatted_terms = [f'TITLE-ABS ( "{term[:-1]}*" )' if term.endswith('s') else f'TITLE-ABS ( "{term}" )' for term in terms]
         return ' AND '.join(formatted_terms)
+    
+    def replace_quotes(self, strings):
+        replaced_strings = [string.replace("'", "").replace('"', '') for string in strings]
+        return replaced_strings
+
+    def delete_brackets_content(self, lst):
+        result = []
+        for item in lst:
+            if isinstance(item, str):
+                item = re.sub(r'\[.*?\]', '', item)
+                item = re.sub(r'\{.*?\}', '', item)
+            result.append(item)
+        return result
 
     def refine_search(self, query: str, basis: str) -> Tuple[pd.DataFrame, Optional[str]]:
         max_attempts = 5
