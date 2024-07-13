@@ -155,6 +155,162 @@ class ReportGenerator:
         theme_embedding = self.get_embeddings([theme])[0]
         df['similarities'] = df.Embedding.apply(lambda emb: np.dot(theme_embedding, emb))
         return df.nlargest(n, 'similarities')
+    
+    def run_bertopic(self, data_embedding):
+        embeddings = data_embedding["embedding"].tolist()
+        docs = data_embedding["input"].tolist()
+        vectorizer_model = CountVectorizer(stop_words="english", ngram_range=(1, 3))
+        vo = voyageai.Client()
+
+        max_iterations = 50
+
+        for i in range(max_iterations):
+            random_state = 42 + i  # Increment random_state for each iteration
+
+            umap_model = UMAP(n_components=5, n_neighbors=15, min_dist=0.0, metric='cosine', low_memory=False)
+            umap_embeddings = umap_model.fit_transform(embeddings)
+
+            ClusterSize = int(len(docs)/100)
+            if ClusterSize < 10:
+                ClusterSize = 10
+
+            SampleSize = int(ClusterSize/10)
+            if SampleSize < 5:
+                SampleSize = 5
+
+            hdbscan_model = HDBSCAN(gen_min_span_tree=True, prediction_data=True, min_cluster_size=ClusterSize,
+                                    min_samples=SampleSize, metric='euclidean', cluster_selection_method='eom')
+            vectorizer_model = CountVectorizer(stop_words="english", ngram_range=(1, 3))
+            empty_dimensionality_model = BaseDimensionalityReduction()
+
+            topic_model = BERTopic(vectorizer_model=vectorizer_model, umap_model=empty_dimensionality_model,
+                                hdbscan_model=hdbscan_model, top_n_words=10,
+                                verbose=True, n_gram_range=(1, 3))
+            topics = topic_model.fit_transform(docs, umap_embeddings)
+            bertopic_df = topic_model.get_topic_info()
+
+            # Check if the condition is met
+            if len(bertopic_df) > 15:
+                break  # Condition met, exit loop
+            else:
+                random_state += 1  # Increment random_state and continue loop
+
+        return bertopic_df, umap_embeddings, topic_model
+    
+    def filter_bertopic(self, bertopic_df, query):
+        client = Together()
+        
+        Keywords = bertopic_df['Representation']
+        representative_docs = bertopic_df['Representative_Docs']
+
+        formatted_keywords = [', '.join(sublist) for sublist in Keywords]
+        formatted_docs = ['\n'.join(sublist) for sublist in representative_docs]
+
+        responses = []
+        keywords_list = []
+        documents_list = []
+        similarities_list = []
+        index_list = []
+        index_number = 0
+
+        query_embedding = self.get_embedding(query)
+
+        for i in range(len(formatted_keywords)):
+            prompt = f"""
+            You will receive keywords and a small sample of parts of documents from a topic. Assign a short label to the topic, based on the keywords. DO NOT make up new information that is not contained in the keywords.
+
+            Example:
+            Keywords:
+            [keyword 1,keyword 2,keyword 3,keyword 4,keyword 5,keyword 6,keyword 7,keyword 8,keyword 9,keyword 10]
+
+            Documents:
+            [document 1.
+            document 2.
+            document 3]
+
+            Topic assignment:
+            [short topic based upon the keywords]
+            
+            INSTRUCTIONS:
+            
+            1. The answer should NOT use the word "topic" or "label".
+
+            2. The label should have no more than 10 words, reflecting ONLY ONE topic.
+
+            3. The label should be based ONLY on the keywords provided
+
+            4. The answer should NOT be based on the documents, use only the keywords.
+            
+            4. Your answer should be short and succinctly reflect the main topic present ONLY on the Keywords.
+
+            5. Prioritize the FIRST KEYWORDS more heavily when determining the answer, giving them greater weight than subsequent keywords
+
+            Your task:
+            Keywords: 
+            [{formatted_keywords[i]}]
+
+            Documents: 
+            [{formatted_docs[i]}]
+
+            Your response:
+            """
+
+            response = client.chat.completions.create(
+                messages=[
+                    {'role': 'system', 'content': 'You are an expert at creating topic labels. In this task, you will be provided with a set of keywords related to ONE particular topic. Your job is to use these keywords, prioritizing the first keywords, to come up with an accurate and short label for the topic. It is crucial that you base your label STRICLY on the keywords.'},
+                    {'role': 'user', 'content': prompt},
+                ],
+                model="meta-llama/Llama-3-70b-chat-hf",
+                temperature=0,
+            )
+            response_content = response.choices[0].message.content
+
+            response_embedding = self.get_embedding(response_content)
+            
+            # Calculate similarity using dot product
+            similarity = np.dot(query_embedding, response_embedding)
+
+            responses.append(response_content)
+            keywords_list.append(formatted_keywords[i])
+            documents_list.append(formatted_docs[i])
+            similarities_list.append(similarity)
+            index_list.append(index_number)
+
+            index_number += 1 
+
+        topics = pd.DataFrame({
+            "Response": responses,
+            "Keywords": keywords_list,
+            "Documents": documents_list,
+            "Similarities": similarities_list,
+            "Indexes": index_list
+        })
+        topics['Choice'] = 'Y'
+
+        topics = topics.sort_values(by="Similarities", ascending=False)
+        
+        for index, row in topics.iterrows():
+            if row['Similarities'] < 0.85:
+                topics.at[index, 'Choice'] = 'N'
+
+        n_indices = topics[topics['Choice'] == 'N'].index
+
+        for idx in n_indices:
+            current_min = topics[topics["Choice"] == 'Y']["Similarities"].min()
+            if current_min > 0.85:
+                current_min = 0.85
+            if current_min - topics.loc[idx, "Similarities"] <= 0.01 and topics.loc[idx, "Similarities"] > 0.8:
+                topics.loc[idx, "Choice"] = "Y"
+
+        topics = topics.sort_values(by="Indexes", ascending=True)
+
+        modified_topics = topics.drop(index=0)
+        duplicates = modified_topics['Response'].duplicated(keep='first')
+        duplicates = duplicates.reindex(topics.index, fill_value=False)
+        topics.loc[duplicates, 'Choice'] = 'N'
+        topics['Choice'][0] = 'N'
+
+        return topics
 
     def generate_report(self, theme: str, df_scopus: pd.DataFrame) -> str:
         df_scopus['combined_text'] = df_scopus.apply(lambda row: f"""{row['title']}. {row['description']}""", axis=1)
