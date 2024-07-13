@@ -407,9 +407,8 @@ class ReportGenerator:
             "input": filtered_df["Text Response"].tolist()
         }
 
-
         send_df, umap_embeddings, bertopic_model = self.run_bertopic(data_embedding)
-
+        error
         report = self.generate_report(input_user, df_scopus)
         html_output = markdown2.markdown(report)
 
