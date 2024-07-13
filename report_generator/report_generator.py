@@ -395,7 +395,9 @@ class ReportGenerator:
 
         if failure:
             return failure, query, "failure"
-
+        
+        filtered_df = self.filter_df(df_scopus)
+        print(filtered_df)
         report = self.generate_report(input_user, df_scopus)
         html_output = markdown2.markdown(report)
 
