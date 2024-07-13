@@ -134,9 +134,6 @@ class ReportGenerator:
                 logger.info('Optimal number of results found.')
                 s = ScopusSearch(q, verbose=True, view="COMPLETE")
                 df_scopus = pd.DataFrame(s.results)
-                #TESTING
-                df_scopus = self.filter_df(df_scopus)
-
                 break
         else:
             failure = 'Too many results, make the search more specific' if results_size > 10000 else 'Too few results, make the search less specific'
@@ -145,6 +142,8 @@ class ReportGenerator:
         return df_scopus, failure
 
     def get_embeddings(self, texts: List[str], batch_size: int = 128, input_type: Optional[str] = None) -> np.ndarray:
+        texts = [text.replace("\n", " ") for text in texts]
+        texts = ["Cluster the text: " + text for text in texts]
         all_embeddings = []
         for i in range(0, len(texts), batch_size):
             batch_texts = texts[i:i+batch_size]
@@ -153,12 +152,12 @@ class ReportGenerator:
         return np.array(all_embeddings)
 
     def search_embeddings(self, df: pd.DataFrame, theme: str, n: int = 100) -> pd.DataFrame:
-        theme_embedding = self.get_embeddings([theme], input_type="query")[0]
+        theme_embedding = self.get_embeddings([theme])[0]
         df['similarities'] = df.Embedding.apply(lambda emb: np.dot(theme_embedding, emb))
         return df.nlargest(n, 'similarities')
 
     def generate_report(self, theme: str, df_scopus: pd.DataFrame) -> str:
-        df_scopus['combined_text'] = df_scopus.apply(lambda row: f"""Title: {row['title']}. Abstract: {row['description']}""", axis=1)
+        df_scopus['combined_text'] = df_scopus.apply(lambda row: f"""{row['title']}. {row['description']}""", axis=1)
         df_scopus['Embedding'] = self.get_embeddings(df_scopus['combined_text'].tolist(), input_type="document").tolist()
         print(df_scopus.combined_text[0])
         relevant_docs = self.search_embeddings(df_scopus, theme, n=50)
