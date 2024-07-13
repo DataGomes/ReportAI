@@ -397,7 +397,19 @@ class ReportGenerator:
             return failure, query, "failure"
         
         filtered_df = self.filter_df(df_scopus)
-        print(filtered_df)
+
+        # Get the embeddings
+        embeddings = self.get_embeddings(filtered_df["Text Response"].tolist())
+
+        # Create a dictionary with both embeddings and input phrases
+        data_embedding = {
+            "embedding": embeddings.tolist(),
+            "input": filtered_df["Text Response"].tolist()
+        }
+
+
+        send_df, umap_embeddings, bertopic_model = self.run_bertopic(data_embedding)
+
         report = self.generate_report(input_user, df_scopus)
         html_output = markdown2.markdown(report)
 
