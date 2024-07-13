@@ -76,7 +76,44 @@ class ReportGenerator:
                 item = re.sub(r'\{.*?\}', '', item)
             result.append(item)
         return result
+    
+    def filter_df(self, df_scopus: pd.DataFrame) -> pd.DataFrame:
+        # Filter out rows with invalid descriptions or DOIs
+        mask_desc = df_scopus["description"].isna() | (df_scopus["description"] == '') | (df_scopus["description"] == '[No abstract available]')
+        mask_doi = df_scopus["doi"].isnull() | (df_scopus["doi"] == '') | df_scopus['doi'].isna() | (df_scopus["doi"] == 'None')
+        filtered_df = df_scopus[~(mask_desc | mask_doi)].reset_index(drop=True)
 
+        # Clean and fix text in description and title
+        for col in ['description', 'title']:
+            filtered_df[col] = filtered_df[col].apply(lambda x: ftfy.fix_text(self.clean(x)))
+
+        # Process abstracts
+        abstracts = filtered_df['description'].tolist()
+        abstracts = self.replace_quotes(self.delete_brackets_content(abstracts))
+
+        all_sentences = []
+        for idx, text in enumerate(abstracts):
+            sentences = sent_tokenize(text)
+            title = filtered_df['title'][idx]
+            
+            if len(sentences) == 1:
+                all_sentences.append((f"{title}. {sentences[0]}", idx))
+            elif len(sentences) == 2:
+                all_sentences.append((f"{title}. {' '.join(sentences)}", idx))
+            elif len(sentences) >= 3:
+                for i in range(1, len(sentences) - 1):
+                    all_sentences.append((f"{title}. {' '.join(sentences[i-1:i+2])}", idx))
+
+        # Create a DataFrame with processed sentences
+        df_sentences = pd.DataFrame(all_sentences, columns=['Text Response', 'Abstract Index'])
+        df_sentences['sentence_index'] = df_sentences.index
+        df_sentences.set_index("Abstract Index", inplace=True)
+
+        # Merge the original DataFrame with the processed sentences
+        result_df = filtered_df.merge(df_sentences, left_index=True, right_index=True, how='left')
+
+        return result_df
+    
     def refine_search(self, query: str, basis: str) -> Tuple[pd.DataFrame, Optional[str]]:
         max_attempts = 5
         year = 2019
@@ -97,9 +134,12 @@ class ReportGenerator:
                 logger.info('Optimal number of results found.')
                 s = ScopusSearch(q, verbose=True, view="COMPLETE")
                 df_scopus = pd.DataFrame(s.results)
+                #TESTING
+                df_scopus = self.filter_df(df_scopus)
+
                 break
         else:
-            failure = 'Too many results, make the search more specific' if results_size > 50000 else 'Too few results, make the search less specific'
+            failure = 'Too many results, make the search more specific' if results_size > 10000 else 'Too few results, make the search less specific'
 
         logger.info(f'Final search results size: {results_size}')
         return df_scopus, failure
