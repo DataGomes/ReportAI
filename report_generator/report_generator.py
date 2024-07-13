@@ -194,7 +194,7 @@ class ReportGenerator:
                 break  # Condition met, exit loop
             else:
                 random_state += 1  # Increment random_state and continue loop
-
+        print("RAN BERTOPIC")
         return bertopic_df, umap_embeddings, topic_model
     
     def filter_bertopic(self, bertopic_df, query):
