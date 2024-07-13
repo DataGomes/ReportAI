@@ -42,8 +42,8 @@ from report_generator import ReportGenerator, set_api_keys
 # Set your API keys
 set_api_keys(
     pybliometrics_key="your_pybliometrics_key",
-    voyage_key="pa-R_4aJtg1lXPJLMhMiEPDgItNljdKD0pKrINjNIUTkg0",
-    together_key="f30ef66c7dfe7e8b3ac40b35547ab3380453edbb6ad2a2342ff610191307d75c"
+    voyage_key="your voyage key",
+    together_key="your together key"
 )
 
 # Create a ReportGenerator instance
