@@ -315,7 +315,6 @@ class ReportGenerator:
     def generate_report(self, theme: str, df_scopus: pd.DataFrame) -> str:
         df_scopus['combined_text'] = df_scopus.apply(lambda row: f"""{row['title']}. {row['description']}""", axis=1)
         df_scopus['Embedding'] = self.get_embeddings(df_scopus['combined_text'].tolist(), input_type="document").tolist()
-        print(df_scopus.combined_text[0])
         relevant_docs = self.search_embeddings(df_scopus, theme, n=50)
         query = f"Is this text related to the topic: \"{theme}\"?"
         results = self.vo.rerank(query, relevant_docs['combined_text'].tolist(), model="rerank-lite-1", top_k=10)
