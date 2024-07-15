@@ -13,7 +13,7 @@ from together import Together
 import pybliometrics
 import voyageai
 import nltk
-
+fail
 # Attempt to import WeasyPrint, but handle the import error gracefully
 try:
     from weasyprint import HTML
