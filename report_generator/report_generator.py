@@ -14,6 +14,11 @@ import pybliometrics
 import voyageai
 import nltk
 import ftfy
+from sklearn.feature_extraction.text import CountVectorizer
+from umap import UMAP
+from bertopic.dimensionality import BaseDimensionalityReduction
+from bertopic import BERTopic
+from hdbscan import HDBSCAN
 
 # Attempt to import WeasyPrint, but handle the import error
 try:
@@ -401,14 +406,13 @@ class ReportGenerator:
         # Get the embeddings
         embeddings = self.get_embeddings(filtered_df["Text Response"].tolist())
 
-        # Create a dictionary with both embeddings and input phrases
-        data_embedding = {
+        # Create a DataFrame with both embeddings and input phrases
+        data_embedding = pd.DataFrame({
             "embedding": embeddings.tolist(),
             "input": filtered_df["Text Response"].tolist()
-        }
+        })
 
         send_df, umap_embeddings, bertopic_model = self.run_bertopic(data_embedding)
-        error
         report = self.generate_report(input_user, df_scopus)
         html_output = markdown2.markdown(report)
 
