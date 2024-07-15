@@ -3,7 +3,7 @@ from typing import List, Tuple, Optional
 import pandas as pd
 import numpy as np
 from nltk.corpus import stopwords
-from nltk.tokenize import word_tokenize
+from nltk.tokenize import word_tokenize, sent_tokenize
 import string
 from pybliometrics.scopus import ScopusSearch
 import re
@@ -13,8 +13,9 @@ from together import Together
 import pybliometrics
 import voyageai
 import nltk
-fail
-# Attempt to import WeasyPrint, but handle the import error gracefully
+import ftfy
+
+# Attempt to import WeasyPrint, but handle the import error
 try:
     from weasyprint import HTML
     WEASYPRINT_AVAILABLE = True
