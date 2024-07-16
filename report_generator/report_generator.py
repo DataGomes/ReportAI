@@ -147,18 +147,27 @@ class ReportGenerator:
         logger.info(f'Final search results size: {results_size}')
         return df_scopus, failure
 
-    def get_embeddings(self, texts: List[str], batch_size: int = 128, input_type: Optional[str] = None) -> np.ndarray:
+    def get_embeddings(self, texts, batch_size: int = 128, input_type: Optional[str] = None):
+        
+        if not isinstance(texts, list):
+            texts = [texts]        
         texts = [text.replace("\n", " ") for text in texts]
+
         texts = ["Cluster the text: " + text for text in texts]
+
         all_embeddings = []
         for i in range(0, len(texts), batch_size):
             batch_texts = texts[i:i+batch_size]
             batch_embeddings = self.vo.embed(batch_texts, model="voyage-large-2-instruct", input_type=input_type).embeddings
             all_embeddings.extend(batch_embeddings)
-        return np.array(all_embeddings)
+
+        if len(all_embeddings) == 1:
+            return all_embeddings[0]  # This ensures the output is a single vector (1024,)
+        else:
+            return all_embeddings
 
     def search_embeddings(self, df: pd.DataFrame, theme: str, n: int = 100) -> pd.DataFrame:
-        theme_embedding = self.get_embeddings([theme])[0]
+        theme_embedding = self.get_embeddings(theme)
         df['similarities'] = df.Embedding.apply(lambda emb: np.dot(theme_embedding, emb))
         return df.nlargest(n, 'similarities')
     
@@ -200,7 +209,6 @@ class ReportGenerator:
                 break  # Condition met, exit loop
             else:
                 random_state += 1  # Increment random_state and continue loop
-        print("RAN BERTOPIC")
         return bertopic_df, umap_embeddings, topic_model
     
     def filter_bertopic(self, bertopic_df, query):
@@ -219,9 +227,8 @@ class ReportGenerator:
         index_list = []
         index_number = 0
 
-        query_embedding = self.get_embedding(query)
-
-        for i in range(len(formatted_keywords)):
+        #for i in range(len(formatted_keywords)):
+        for i in range(2):
             prompt = f"""
             You will receive keywords and a small sample of parts of documents from a topic. Assign a short label to the topic, based on the keywords. DO NOT make up new information that is not contained in the keywords.
 
@@ -271,10 +278,25 @@ class ReportGenerator:
             )
             response_content = response.choices[0].message.content
 
-            response_embedding = self.get_embedding(response_content)
+            query_embedding = self.get_embeddings(query)
+
+
+            #dimensionality of query_embedding print
+
+            response_embedding = self.get_embeddings(response_content)
+
+            similarity = np.dot(query_embedding, response_embedding)
+
+            embeddings_df = pd.DataFrame({'Embedding': [response_embedding]})
+
             
             # Calculate similarity using dot product
-            similarity = np.dot(query_embedding, response_embedding)
+            similarity_scores = []
+            for idx,r in enumerate(embeddings_df.Embedding):
+                similarity = np.dot(query_embedding, r)
+                print(similarity)
+                similarity_scores.append(similarity)
+            #similarity = np.dot(query_embedding, response_embedding)
 
             responses.append(response_content)
             keywords_list.append(formatted_keywords[i])
@@ -294,7 +316,7 @@ class ReportGenerator:
         topics['Choice'] = 'Y'
 
         topics = topics.sort_values(by="Similarities", ascending=False)
-        
+
         for index, row in topics.iterrows():
             if row['Similarities'] < 0.85:
                 topics.at[index, 'Choice'] = 'N'
@@ -320,7 +342,7 @@ class ReportGenerator:
 
     def generate_report(self, theme: str, df_scopus: pd.DataFrame) -> str:
         df_scopus['combined_text'] = df_scopus.apply(lambda row: f"""{row['title']}. {row['description']}""", axis=1)
-        df_scopus['Embedding'] = self.get_embeddings(df_scopus['combined_text'].tolist(), input_type="document").tolist()
+        df_scopus['Embedding'] = self.get_embeddings(df_scopus['combined_text'].tolist(), input_type="document")
         relevant_docs = self.search_embeddings(df_scopus, theme, n=50)
         query = f"Is this text related to the topic: \"{theme}\"?"
         results = self.vo.rerank(query, relevant_docs['combined_text'].tolist(), model="rerank-lite-1", top_k=10)
@@ -408,11 +430,14 @@ class ReportGenerator:
 
         # Create a DataFrame with both embeddings and input phrases
         data_embedding = pd.DataFrame({
-            "embedding": embeddings.tolist(),
+            "embedding": embeddings,
             "input": filtered_df["Text Response"].tolist()
         })
 
         send_df, umap_embeddings, bertopic_model = self.run_bertopic(data_embedding)
+
+        filtered_send_df = self.filter_bertopic(send_df, input_user)
+
         report = self.generate_report(input_user, df_scopus)
         html_output = markdown2.markdown(report)
 
