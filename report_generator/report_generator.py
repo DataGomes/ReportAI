@@ -19,6 +19,8 @@ from umap import UMAP
 from bertopic.dimensionality import BaseDimensionalityReduction
 from bertopic import BERTopic
 from hdbscan import HDBSCAN
+from functools import partial
+from concurrent.futures import ThreadPoolExecutor
 
 # Attempt to import WeasyPrint, but handle the import error
 try:
@@ -167,9 +169,17 @@ class ReportGenerator:
             return all_embeddings
 
     def search_embeddings(self, df: pd.DataFrame, theme: str, n: int = 100) -> pd.DataFrame:
-        theme_embedding = self.get_embeddings(theme)
-        df['similarities'] = df.Embedding.apply(lambda emb: np.dot(theme_embedding, emb))
-        return df.nlargest(n, 'similarities')
+        embedding = self.get_embeddings(theme)
+
+        similarity_scores = []
+
+        for idx,r in enumerate(df.Embedding):
+            similarity = np.dot(embedding, r)
+            similarity_scores.append(similarity)
+
+        df['similarities'] = similarity_scores
+        res = df.sort_values('similarities', ascending=False).head(n)
+        return res
     
     def run_bertopic(self, data_embedding):
         embeddings = data_embedding["embedding"].tolist()
@@ -227,8 +237,7 @@ class ReportGenerator:
         index_list = []
         index_number = 0
 
-        #for i in range(len(formatted_keywords)):
-        for i in range(10):
+        for i in range(len(formatted_keywords)):
             prompt = f"""
             You will receive keywords and a small sample of parts of documents from a topic. Assign a short label to the topic, based on the keywords. DO NOT make up new information that is not contained in the keywords.
 
@@ -340,20 +349,16 @@ class ReportGenerator:
 
         return topics
 
-    def generate_report(self, theme: str, df_scopus: pd.DataFrame) -> str:
-        data_embedding = pd.DataFrame({
-            'embedding': self.get_embeddings(df_scopus['description'].tolist()),
-            'input': df_scopus['description'].tolist()
-        })
+    def generate_report(self, theme: str, df_scopus: pd.DataFrame, data_embedding) -> str:
+
         data_embedding.rename(columns={'embedding': 'Embedding'}, inplace=True)
-        
         res = self.search_embeddings(data_embedding, theme, n=100)
         index_list = res.index.tolist()
-
-        filtered_result_df = df_scopus[df_scopus.index.isin(index_list)]
-        filtered_result_df = filtered_result_df.merge(res[['similarities']], left_index=True, right_index=True, how='left')
+        filtered_result_df = df_scopus[df_scopus["sentence_index"].isin(index_list)]
+        print(len(filtered_result_df))
+        filtered_result_df['sentence_index'] = pd.Categorical(filtered_result_df['sentence_index'], categories=index_list, ordered=True)
+        filtered_result_df = filtered_result_df.merge(res[['similarities']], left_on='sentence_index', right_index=True, how='left')
         filtered_result_df = filtered_result_df.sort_values(by='similarities', ascending=False)
-
         # Separate duplicates and non-duplicates
         duplicates = filtered_result_df[filtered_result_df.index.duplicated(keep=False)]
         non_duplicates = filtered_result_df[~filtered_result_df.index.duplicated(keep=False)]
@@ -463,8 +468,19 @@ class ReportGenerator:
 
         filtered_send_df = self.filter_bertopic(send_df, input_user)
 
-        report = self.generate_report(input_user, df_scopus)
-        html_output = markdown2.markdown(report)
+
+        # Using ThreadPoolExecutor to parallelize API calls
+        partial_report = partial(self.generate_report,  df_scopus=filtered_df, data_embedding = data_embedding)
+        theme = filtered_send_df[filtered_send_df['Choice'] == 'Y']['Response'].tolist()
+        with ThreadPoolExecutor() as executor:
+            # Using map to ensure the order of results matches the order of 'themes'
+            results = list(executor.map(partial_report, theme))
+        # Combining all individual reports into a single string
+        final_combined_report = "\n\n".join(results)
+
+
+        #report = self.generate_report(input_user, df_scopus)
+        html_output = markdown2.markdown(final_combined_report)
 
         if output_dir and WEASYPRINT_AVAILABLE:
             querypdf = pd.Series([input_user]).str.capitalize().values[0]
