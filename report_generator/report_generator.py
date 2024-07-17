@@ -228,7 +228,7 @@ class ReportGenerator:
         index_number = 0
 
         #for i in range(len(formatted_keywords)):
-        for i in range(2):
+        for i in range(10):
             prompt = f"""
             You will receive keywords and a small sample of parts of documents from a topic. Assign a short label to the topic, based on the keywords. DO NOT make up new information that is not contained in the keywords.
 
@@ -341,28 +341,58 @@ class ReportGenerator:
         return topics
 
     def generate_report(self, theme: str, df_scopus: pd.DataFrame) -> str:
-        df_scopus['combined_text'] = df_scopus.apply(lambda row: f"""{row['title']}. {row['description']}""", axis=1)
-        df_scopus['Embedding'] = self.get_embeddings(df_scopus['combined_text'].tolist(), input_type="document")
-        relevant_docs = self.search_embeddings(df_scopus, theme, n=50)
-        query = f"Is this text related to the topic: \"{theme}\"?"
-        results = self.vo.rerank(query, relevant_docs['combined_text'].tolist(), model="rerank-lite-1", top_k=10)
+        data_embedding = pd.DataFrame({
+            'embedding': self.get_embeddings(df_scopus['description'].tolist()),
+            'input': df_scopus['description'].tolist()
+        })
+        data_embedding.rename(columns={'embedding': 'Embedding'}, inplace=True)
         
-        top_papers = [relevant_docs.iloc[item.index] for item in results.results]
-        formatted_abstracts = '\n\n'.join(f"{paper['title']}\n{paper['description']}" for paper in top_papers)
+        res = self.search_embeddings(data_embedding, theme, n=100)
+        index_list = res.index.tolist()
 
-        query = self._construct_query(theme, formatted_abstracts)
-        summary = self._get_ai_summary(query, theme)
+        filtered_result_df = df_scopus[df_scopus.index.isin(index_list)]
+        filtered_result_df = filtered_result_df.merge(res[['similarities']], left_index=True, right_index=True, how='left')
+        filtered_result_df = filtered_result_df.sort_values(by='similarities', ascending=False)
+
+        # Separate duplicates and non-duplicates
+        duplicates = filtered_result_df[filtered_result_df.index.duplicated(keep=False)]
+        non_duplicates = filtered_result_df[~filtered_result_df.index.duplicated(keep=False)]
+
+        top_two_list = []
+
+        if not duplicates.empty:
+            for name, group in duplicates.groupby(duplicates.index):
+                top_two_list.append(group.head(1))    
+
+        top_two_duplicates = pd.concat(top_two_list) if top_two_list else pd.DataFrame()
+
+        # Combine the top two duplicates with all non-duplicates
+        final_result = pd.concat([non_duplicates, top_two_duplicates])
+
+        # Sort by similarities in descending order
+        filtered_result_df = final_result.sort_values(by='similarities', ascending=False)
+
+        query = f"Is this text related to the topic: \"{theme}\"?"
+        results = self.vo.rerank(query, filtered_result_df['description'].tolist(), model="rerank-1", top_k=3)
+
+        textsranked = [item.document for item in results.results]
+        formatted_top = '\n\n'.join(f"{doc}" for doc in textsranked)
+
+        query = self._construct_query(theme, formatted_top)
+        the_answer = self._get_ai_summary(query, theme)
+
+        exact_matches = filtered_result_df[filtered_result_df['description'].isin(textsranked)]
+        de_exact_matches = exact_matches.drop_duplicates(subset='doi', keep='first')
 
         doi_string = '\n\n'.join(
-            f"- [{paper['title']}](https://doi.org/{paper['doi']})"
-            for paper in top_papers
+            f'- [{row["title"] or row["doi"]}](https://doi.org/{row["doi"]})'
+            for index, row in de_exact_matches.iterrows()
         )
 
-        return f"# {theme.capitalize()}\n\n{summary}\n\n## References\n{doi_string}"
+        return f"# {theme.capitalize()}\n\n{the_answer}\n\n## References\n{doi_string}"
 
-    @staticmethod
-    def _construct_query(theme: str, formatted_abstracts: str) -> str:
-        return  f"""You will receive a selection of parts of abstracts. Your task is to discuss the content of the texts related to of the topic:'{theme}' based ONLY upon the response of the selected abstracts.
+    def _construct_query(self, theme: str, formatted_abstracts: str) -> str:
+        return f"""You will receive a selection of parts of abstracts. Your task is to create a general summary of the topic:'{theme}' based ONLY upon the response of the selected abstracts.
 
         EXAMPLE:
         \"\"\"
@@ -372,29 +402,24 @@ class ReportGenerator:
 
         Text of abstract 3.
 
-        ... (more abstracts)
-
         YOUR RESPONSE:
-        The {theme} Use text of abstract 1 to discuss the topic. Use text of abstract 2 to discuss the topic. Use text of abstract 3 to discuss the topic... (more abstracts)
+        The {theme} Use text of abstract 1 to discuss the topic. Use text of abstract 2 to discuss the topic. Use text of abstract 3 to discuss the topic.
         \"\"\"
 
         INSTRUCTIONS:
         1. DO NOT use information outside of the provided text.
-        
-        2. Create a summary based ONLY on the response. 
-
-        3. Your answer should be a summary about the topic.
-
-        4. Answer directly, DO NOT tell this is the summary or use the word "summary" or "abstract" in your response.
-
-        5. Start your response mentioning {theme}.
+        2. The summary should be written in one paragraph.
+        3. Create a summary based ONLY on the response. 
+        4. Your answer should be a summary about the topic.
+        5. Answer directly, DO NOT tell this is the summary or use the word "summary" or "abstract" in your response.
+        6. Start your response mentioning {theme}.
 
         SELECTED ABSTRACTS:
         \"\"\"
         {formatted_abstracts}
         \"\"\"
 
-        Your task is to discuss the content of the texts related to the topic:'{theme}' based ONLY upon the abstracts.
+        Your task is to create a general summary of the topic:'{theme}' based ONLY upon the abstracts.
 
         YOUR RESPONSE:
         """
@@ -402,7 +427,7 @@ class ReportGenerator:
     def _get_ai_summary(self, query: str, theme: str) -> str:
         response = self.together_client.chat.completions.create(
             messages=[
-                {'role': 'system', 'content': f'You are a scientific expert on {theme}. Create a comprehensive summary based solely on the provided abstracts, without using external information.'},
+                {'role': 'system', 'content': f'You are a scientist working on a project about scientific abstracts related to the topic: {theme}. You are an expert at writing summaries based upon abstracts. You DO NOT use information outside of the provided text. You are a scientific abstract summarizer, so the summary must be based ONLY on the provided text. Answer directly about the topic: {theme}, DO NOT tell this is the summary or use the word "summary" or "abstract" in your response.'},
                 {'role': 'user', 'content': query},
             ],
             model="meta-llama/Llama-3-70b-chat-hf",
