@@ -21,6 +21,7 @@ from bertopic import BERTopic
 from hdbscan import HDBSCAN
 from functools import partial
 from concurrent.futures import ThreadPoolExecutor
+from threading import Lock
 
 # Attempt to import WeasyPrint, but handle the import error
 try:
@@ -50,6 +51,8 @@ class ReportGenerator:
         self.punctuation_translator = str.maketrans('', '', string.punctuation.replace('-', ''))
         self.vo = voyageai.Client()
         self.together_client = Together()
+        self.counter = 0
+        self.counter_lock = Lock()
 
     def clean(self, text):
         #remove @ppl, url
@@ -303,7 +306,6 @@ class ReportGenerator:
             similarity_scores = []
             for idx,r in enumerate(embeddings_df.Embedding):
                 similarity = np.dot(query_embedding, r)
-                print(similarity)
                 similarity_scores.append(similarity)
             #similarity = np.dot(query_embedding, response_embedding)
 
@@ -351,11 +353,15 @@ class ReportGenerator:
 
     def generate_report(self, theme: str, df_scopus: pd.DataFrame, data_embedding) -> str:
 
+
+        with self.counter_lock:
+            self.counter += 1
+            local_counter = self.counter
+
         data_embedding.rename(columns={'embedding': 'Embedding'}, inplace=True)
         res = self.search_embeddings(data_embedding, theme, n=100)
         index_list = res.index.tolist()
         filtered_result_df = df_scopus[df_scopus["sentence_index"].isin(index_list)]
-        print(len(filtered_result_df))
         filtered_result_df['sentence_index'] = pd.Categorical(filtered_result_df['sentence_index'], categories=index_list, ordered=True)
         filtered_result_df = filtered_result_df.merge(res[['similarities']], left_on='sentence_index', right_index=True, how='left')
         filtered_result_df = filtered_result_df.sort_values(by='similarities', ascending=False)
@@ -394,7 +400,7 @@ class ReportGenerator:
             for index, row in de_exact_matches.iterrows()
         )
 
-        return f"### {theme.capitalize()}\n\n{the_answer}\n\n## References\n{doi_string}"
+        return f"### {local_counter}. {theme.capitalize()}\n\n{the_answer}\n\n#### References\n{doi_string}"
 
     def _construct_query(self, theme: str, formatted_abstracts: str) -> str:
         return f"""You will receive a selection of parts of abstracts. Your task is to create a general summary of the topic:'{theme}' based ONLY upon the response of the selected abstracts.
@@ -491,7 +497,6 @@ class ReportGenerator:
         final_combined_report = "\n\n".join(results)
 
         TOC = self.create_markdown_toc(final_combined_report)
-        print("TOCTOC", TOC)
         inputpdf = pd.Series([input_user]).str.capitalize().values[0]
         introduction = f"This report provides an AI-based analysis of the most representative topics related to {input_user}, identified based on the search criteria. The references were directly extracted from scientific databases, while the summaries were constructed based upon the abstracts of the references using AI. By leveraging an extensive database of scientific sources, the report delivers reference-based results. While this report is based on scientific data sources, users should exercise caution in interpretation, given the inherent complexities and evolving nature of AI-based analysis."
 
