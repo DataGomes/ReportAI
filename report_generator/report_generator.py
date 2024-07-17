@@ -394,7 +394,7 @@ class ReportGenerator:
             for index, row in de_exact_matches.iterrows()
         )
 
-        return f"# {theme.capitalize()}\n\n{the_answer}\n\n## References\n{doi_string}"
+        return f"### {theme.capitalize()}\n\n{the_answer}\n\n## References\n{doi_string}"
 
     def _construct_query(self, theme: str, formatted_abstracts: str) -> str:
         return f"""You will receive a selection of parts of abstracts. Your task is to create a general summary of the topic:'{theme}' based ONLY upon the response of the selected abstracts.
@@ -439,6 +439,18 @@ class ReportGenerator:
             temperature=0,
         )
         return response.choices[0].message.content
+    def create_markdown_toc(self, text):
+        lines = text.split('\n')
+        toc = ["## Table of topics"]
+        
+        for line in lines:
+            if line.startswith('### '):
+                title = line[4:].strip()
+                # Use a more robust way to create slug for the link
+                link = re.sub(r'[^\w\s-]', '', title).strip().lower().replace(' ', '-')
+                toc.append(f"\n\n[{title}](#{link})")
+        
+        return '\n'.join(toc)
 
     def run_report(self, input_user: str, output_dir: str = None) -> Tuple[str, str, str]:
         clean_string = self.remove_punctuation(input_user).lower()
@@ -478,9 +490,15 @@ class ReportGenerator:
         # Combining all individual reports into a single string
         final_combined_report = "\n\n".join(results)
 
+        TOC = self.create_markdown_toc(final_combined_report)
+        print("TOCTOC", TOC)
+        inputpdf = pd.Series([input_user]).str.capitalize().values[0]
+        introduction = f"This report provides an AI-based analysis of the most representative topics related to {input_user}, identified based on the search criteria. The references were directly extracted from scientific databases, while the summaries were constructed based upon the abstracts of the references using AI. By leveraging an extensive database of scientific sources, the report delivers reference-based results. While this report is based on scientific data sources, users should exercise caution in interpretation, given the inherent complexities and evolving nature of AI-based analysis."
 
+        final_result_send =f"# {inputpdf}" + "\n\n" + "## Introduction" + "\n\n" + introduction + "\n\n" + TOC + "\n\n" + final_combined_report
+        html_output = markdown2.markdown(final_result_send, extras=["toc", "headers-ids"])
         #report = self.generate_report(input_user, df_scopus)
-        html_output = markdown2.markdown(final_combined_report)
+        #html_output = markdown2.markdown(final_combined_report)
 
         if output_dir and WEASYPRINT_AVAILABLE:
             querypdf = pd.Series([input_user]).str.capitalize().values[0]
