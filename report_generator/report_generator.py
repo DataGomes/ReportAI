@@ -348,7 +348,6 @@ class ReportGenerator:
         duplicates = duplicates.reindex(topics.index, fill_value=False)
         topics.loc[duplicates, 'Choice'] = 'N'
         topics['Choice'][0] = 'N'
-
         return topics
 
     def generate_report(self, theme: str, df_scopus: pd.DataFrame, data_embedding) -> str:
