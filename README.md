@@ -37,7 +37,7 @@ Ensure you have the necessary permissions and subscriptions for Scopus API, Voya
 ### As a library
 
 ```python
-from report_generator import ReportGenerator, set_api_keys
+from report_generator import ReportAI, set_api_keys
 
 # Set your API keys
 set_api_keys(
@@ -46,8 +46,8 @@ set_api_keys(
     together_key="your together key"
 )
 
-# Create a ReportGenerator instance
-generator = ReportGenerator()
+# Create a ReportAI instance
+generator = ReportAI()
 
 # Generate a report
 query = "artificial intelligence in healthcare and genetics"
