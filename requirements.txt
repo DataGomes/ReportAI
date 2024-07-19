@@ -7,3 +7,4 @@ weasyprint
 python-dotenv
 together
 voyageai
+ftfy
