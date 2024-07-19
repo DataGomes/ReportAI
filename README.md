@@ -23,7 +23,6 @@ Before using the library, you need to set up your API keys. You can do this in t
 from report_generator import set_api_keys
 
 set_api_keys(
-    pybliometrics_key="your_pybliometrics_key",
     voyage_key="your_voyage_key",
     together_key="your_together_key"
 )
