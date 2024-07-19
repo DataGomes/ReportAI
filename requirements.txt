@@ -10,3 +10,4 @@ voyageai
 ftfy
 scikit-learn
 umap-learn
+bertopic
