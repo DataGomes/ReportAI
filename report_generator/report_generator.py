@@ -485,7 +485,12 @@ class ReportAI:
 
         filtered_send_df = self.filter_bertopic(send_df, input_user)
 
+        save_df= pd.merge(send_df, filtered_send_df, how='left', left_index=True, right_on='Indexes')
 
+        analysis_df = save_df[['Choice', 'Response', 'Count', 'Similarities' ,'Keywords', 'Representative_Docs']]
+
+
+        
         # Using ThreadPoolExecutor to parallelize API calls
         partial_report = partial(self.generate_report,  df_scopus=filtered_df, data_embedding = data_embedding)
         theme = filtered_send_df[filtered_send_df['Choice'] == 'Y']['Response'].tolist()
@@ -513,7 +518,8 @@ class ReportAI:
             
             model_save_path = os.path.join(absolute_path, f"{querypdf}.pdf")
             HTML(string=html_output).write_pdf(model_save_path)
-            
+
+            analysis_df.to_csv(f'{absolute_path}/analysis_df{query_path}.csv', index=False)
             logger.info(f"Report generated. PDF saved to {model_save_path}")
         elif output_dir and not WEASYPRINT_AVAILABLE:
             logger.warning("PDF generation is disabled due to missing system dependencies.")
@@ -524,6 +530,8 @@ class ReportAI:
             absolute_path = os.path.join(output_dir, query_path)
             os.makedirs(absolute_path, exist_ok=True)
             
+            analysis_df.to_csv(f'{absolute_path}/analysis_df{query_path}.csv', index=False)
+
             model_save_path = os.path.join(absolute_path, f"{querypdf}.html")
             with open(model_save_path, 'w', encoding='utf-8') as f:
                 f.write(html_output)
