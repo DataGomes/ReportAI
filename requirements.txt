@@ -9,3 +9,4 @@ together
 voyageai
 ftfy
 scikit-learn
+umap
