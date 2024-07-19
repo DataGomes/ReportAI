@@ -51,7 +51,7 @@ generator = ReportAI()
 
 # Generate a report
 query = "artificial intelligence in healthcare and genetics"
-html_output, query, html_pdf = generator.run_report(query, output_dir="/home/ag2418/.vscode/Results")
+html_output, query, html_pdf = generator.run_report(query, output_dir="your output directory")
 
 if html_pdf == "failure":
     print(f"Error: {html_output}")
