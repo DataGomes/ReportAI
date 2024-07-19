@@ -16,7 +16,7 @@ Before using the library, you need to set up your API keys. You can do this in t
 1. Set environment variables:
    - VOYAGE_API_KEY
    - TOGETHER_API_KEY
-   - Pybliometrics will guide to set the api key using Scopus.
+   - Pybliometrics will ask to set the api key using Scopus.
 2. Use the `set_api_keys()` function:
 
 ```python
