@@ -380,7 +380,7 @@ class ReportAI:
         final_result = pd.concat([non_duplicates, top_two_duplicates])
 
         # Sort by similarities in descending order
-        filtered_result_df = final_result.sort_values(by='similarities', ascending=False)
+        filtered_result_df = final_result.sort_values(by='similarities', ascending=False).head(20)
 
         query = f"Is this text related to the topic: \"{theme}\"?"
         results = self.vo.rerank(query, filtered_result_df['description'].tolist(), model="rerank-1", top_k=3)
