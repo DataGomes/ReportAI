@@ -14,10 +14,9 @@ pip install git+https://github.com/DataGomes/ReportAI
 Before using the library, you need to set up your API keys. You can do this in two ways:
 
 1. Set environment variables:
-   - PYBLIOMETRICS_API_KEY
    - VOYAGE_API_KEY
    - TOGETHER_API_KEY
-
+   - Pybliometrics will guide to set the api key using Scopus.
 2. Use the `set_api_keys()` function:
 
 ```python
@@ -41,7 +40,6 @@ from report_generator import ReportAI, set_api_keys
 
 # Set your API keys
 set_api_keys(
-    pybliometrics_key="your_pybliometrics_key",
     voyage_key="your voyage key",
     together_key="your together key"
 )
