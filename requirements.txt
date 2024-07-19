@@ -8,4 +8,4 @@ python-dotenv
 together
 voyageai
 ftfy
-sklearn
+scikit-learn
