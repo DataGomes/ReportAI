@@ -125,7 +125,10 @@ class ReportAI:
 
         return result_df
     
-    def refine_search(self, query: str, basis: str) -> Tuple[pd.DataFrame, Optional[str]]:
+    def refine_search(self, query: str, basis: str, csv_path: Optional[str] = None) -> Tuple[pd.DataFrame, Optional[str]]:
+        if csv_path:
+            df_scopus = pd.read_csv(csv_path)
+            return df_scopus, None
         max_attempts = 5
         year = 2019
         q = query + basis
@@ -329,16 +332,16 @@ class ReportAI:
         topics = topics.sort_values(by="Similarities", ascending=False)
 
         for index, row in topics.iterrows():
-            if row['Similarities'] < 0.8:
+            if row['Similarities'] < 0.75:
                 topics.at[index, 'Choice'] = 'N'
 
         n_indices = topics[topics['Choice'] == 'N'].index
 
         for idx in n_indices:
             current_min = topics[topics["Choice"] == 'Y']["Similarities"].min()
-            if current_min > 0.8:
-                current_min = 0.8
-            if current_min - topics.loc[idx, "Similarities"] <= 0.001 and topics.loc[idx, "Similarities"] > 0.75:
+            if current_min > 0.75:
+                current_min = 0.75
+            if current_min - topics.loc[idx, "Similarities"] <= 0.001 and topics.loc[idx, "Similarities"] > 0.70:
                 topics.loc[idx, "Choice"] = "Y"
 
         topics = topics.sort_values(by="Indexes", ascending=True)
@@ -457,7 +460,7 @@ class ReportAI:
         
         return '\n'.join(toc)
 
-    def run_report(self, input_user: str, output_dir: str = None) -> Tuple[str, str, str]:
+    def run_report(self, input_user: str, output_dir: str = None, csv_path: Optional[str] = None) -> Tuple[str, str, str]:
         clean_string = self.remove_punctuation(input_user).lower()
         words = word_tokenize(clean_string)
         terms = [word for word in words if word.lower() not in self.stop_words]
@@ -465,7 +468,7 @@ class ReportAI:
         query = self.format_query(terms)
         basis = ' AND PUBYEAR > 2019 AND LANGUAGE ( "English" ) AND (DOCTYPE ( "ar" ) OR DOCTYPE ( "re" ) OR DOCTYPE ( "cp" ))'
 
-        df_scopus, failure = self.refine_search(query, basis)
+        df_scopus, failure = self.refine_search(query, basis, csv_path)
 
         if failure:
             return failure, query, "failure"
