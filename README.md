@@ -58,6 +58,7 @@ else:
     print("\nSummary of results:")
     print(html_output)
 ```
+If you want to use a csv downloaded from Scopus change html_pdf = generator.run_report(query, output_dir="your output directory", csv_path = "your csv path")
 
 
 ### As a command-line tool
