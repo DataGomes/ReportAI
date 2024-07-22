@@ -59,11 +59,3 @@ else:
     print(html_output)
 ```
 If you want to use a csv downloaded from Scopus change html_pdf = generator.run_report(query, output_dir="your output directory", csv_path = "your csv path")
-
-
-### As a command-line tool
-
-After installation, you can use the `generate_report` command:
-
-```
-generate_report "cars manufacturing management artificial intelligence" --output /path/to/o```
