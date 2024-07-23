@@ -11,7 +11,7 @@ import markdown2
 import logging
 from together import Together
 import pybliometrics
-import voyageai
+import cohere
 import nltk
 import ftfy
 from sklearn.feature_extraction.text import CountVectorizer
@@ -49,7 +49,7 @@ class ReportAI:
     def __init__(self):
         self.stop_words = set(stopwords.words('english')) - {'d'}
         self.punctuation_translator = str.maketrans('', '', string.punctuation.replace('-', ''))
-        self.vo = voyageai.Client()
+        self.co = cohere.Client()
         self.together_client = Together()
         self.counter = 0
         self.counter_lock = Lock()
@@ -72,7 +72,7 @@ class ReportAI:
         return text.translate(self.punctuation_translator)
 
     def format_query(self, terms: List[str]) -> str:
-        formatted_terms = [f'TITLE-ABS ( "{term[:-1]}*" )' if term.endswith('s') else f'TITLE-ABS ( "{term}" )' for term in terms]
+        formatted_terms = [f'TITLE-ABS ( "{term}" )' for term in terms]
         return ' AND '.join(formatted_terms)
     
     def replace_quotes(self, strings):
@@ -156,19 +156,20 @@ class ReportAI:
         logger.info(f'Final search results size: {results_size}')
         return df_scopus, failure
 
-    def get_embeddings(self, texts, batch_size: int = 128, input_type: Optional[str] = None):
-        
+    def get_embeddings(self, texts, input_type: Optional[str] = None):
+        model="embed-english-v3.0"
+        input_type = "clustering"
+
         if not isinstance(texts, list):
             texts = [texts]        
         texts = [text.replace("\n", " ") for text in texts]
 
-        texts = ["Cluster the text: " + text for text in texts]
+        doc_embeddings = self.co.embed(texts=texts,
+                model=model,
+                input_type=input_type,
+                embedding_types=['float'])
 
-        all_embeddings = []
-        for i in range(0, len(texts), batch_size):
-            batch_texts = texts[i:i+batch_size]
-            batch_embeddings = self.vo.embed(batch_texts, model="voyage-large-2-instruct", input_type=input_type).embeddings
-            all_embeddings.extend(batch_embeddings)
+        all_embeddings = doc_embeddings.embeddings.float
 
         if len(all_embeddings) == 1:
             return all_embeddings[0]  # This ensures the output is a single vector (1024,)
@@ -192,7 +193,7 @@ class ReportAI:
         embeddings = data_embedding["embedding"].tolist()
         docs = data_embedding["input"].tolist()
         vectorizer_model = CountVectorizer(stop_words="english", ngram_range=(1, 3))
-        vo = voyageai.Client()
+        co = cohere.Client()
 
         max_iterations = 50
 
@@ -202,7 +203,7 @@ class ReportAI:
             umap_model = UMAP(n_components=5, n_neighbors=15, min_dist=0.0, metric='cosine', low_memory=False, random_state = random_state)
             umap_embeddings = umap_model.fit_transform(embeddings)
 
-            ClusterSize = int(len(docs)/100)
+            ClusterSize = int(len(docs)/200)
             if ClusterSize < 10:
                 ClusterSize = 10
 
@@ -333,16 +334,16 @@ class ReportAI:
         topics = topics.sort_values(by="Similarities", ascending=False)
 
         for index, row in topics.iterrows():
-            if row['Similarities'] < 0.75:
+            if row['Similarities'] < 0.35:
                 topics.at[index, 'Choice'] = 'N'
 
         n_indices = topics[topics['Choice'] == 'N'].index
 
         for idx in n_indices:
             current_min = topics[topics["Choice"] == 'Y']["Similarities"].min()
-            if current_min > 0.75:
-                current_min = 0.75
-            if current_min - topics.loc[idx, "Similarities"] <= 0.001 and topics.loc[idx, "Similarities"] > 0.70:
+            if current_min > 0.35:
+                current_min = 0.35
+            if current_min - topics.loc[idx, "Similarities"] <= 0.001 and topics.loc[idx, "Similarities"] > 0.3:
                 topics.loc[idx, "Choice"] = "Y"
 
         topics = topics.sort_values(by="Indexes", ascending=True)
@@ -380,27 +381,33 @@ class ReportAI:
 
         top_two_duplicates = pd.concat(top_two_list) if top_two_list else pd.DataFrame()
 
-        # Combine the top two duplicates with all non-duplicates
-        final_result = pd.concat([non_duplicates, top_two_duplicates]).sort_index().head(50)
+        final_result = pd.concat([non_duplicates, top_two_duplicates]).sort_values(by='similarities', ascending=False)
+
+        filtered_result_df = final_result.sort_values(by="citedby_count", ascending=False).head(20)
 
         # Sort by similarities in descending order
         filtered_result_df = final_result.sort_values(by='similarities', ascending=False)
 
         query = f"Is this text related to the topic: \"{theme}\"?"
-        results = self.vo.rerank(query, filtered_result_df['description'].tolist(), model="rerank-1", top_k=3)
+        results = self.co.rerank(model="rerank-english-v3.0", query=query, documents=filtered_result_df['Text Response'].tolist(), top_n=3, return_documents=True)
 
-        textsranked = [item.document for item in results.results]
+        textsranked = [item.document.text for item in results.results]
+
         formatted_top = '\n\n'.join(f"{doc}" for doc in textsranked)
 
         query = self._construct_query(theme, formatted_top)
         the_answer = self._get_ai_summary(query, theme)
 
-        exact_matches = filtered_result_df[filtered_result_df['description'].isin(textsranked)]
-        de_exact_matches = exact_matches.drop_duplicates(subset='doi', keep='first')
+
+        exact_matches = pd.DataFrame()  # Empty DataFrame to hold matches
+
+        for doc in textsranked:
+            match = df_scopus[df_scopus['Text Response'] == doc]
+            exact_matches = pd.concat([exact_matches, match], ignore_index=True)
 
         doi_string = '\n\n'.join(
             f'- [{row["title"] or row["doi"]}](https://doi.org/{row["doi"]})'
-            for index, row in de_exact_matches.iterrows()
+            for index, row in exact_matches.iterrows()
         )
 
         return f"### {local_counter}. {theme.capitalize()}\n\n{the_answer}\n\n#### References\n{doi_string}"
