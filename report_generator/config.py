@@ -1,9 +1,8 @@
 import os
 from dotenv import load_dotenv
 import pybliometrics.scopus
-import voyageai
-
-def set_api_keys(pybliometrics_key: str = None, voyage_key: str = None, together_key: str = None):
+import cohere
+def set_api_keys(pybliometrics_key: str = None, cohere_key: str = None, together_key: str = None):
     """
     Set API keys for the various services used by the ReportAI.
     If keys are not provided, it will attempt to load them from environment variables.
@@ -15,8 +14,8 @@ def set_api_keys(pybliometrics_key: str = None, voyage_key: str = None, together
 
     if pybliometrics_key:
         os.environ['PYBLIOMETRICS_API_KEY'] = pybliometrics_key
-    if voyage_key:
-        os.environ['VOYAGE_API_KEY'] = voyage_key
+    if cohere_key:
+        os.environ['CO_API_KEY'] = cohere_key
     if together_key:
         os.environ['TOGETHER_API_KEY'] = together_key
 
@@ -25,7 +24,7 @@ def set_api_keys(pybliometrics_key: str = None, voyage_key: str = None, together
         pybliometrics.scopus.init()
 
         # Set Voyage AI API key
-        voyageai.api_key = os.getenv('VOYAGE_API_KEY')
+        cohere.api_key = os.getenv('CO_API_KEY')
 
         # Set Together API key (if you decide to handle it here)
         # together.api_key = os.getenv('TOGETHER_API_KEY')
