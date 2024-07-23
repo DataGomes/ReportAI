@@ -1,6 +1,6 @@
 # Report Generator
 
-This library generates reports based on scientific literature queries using Scopus, Voyage AI, and Together AI. You can use the query to automatically extract data from Scopus, or provide a csv downloaded from Scopus.
+This library generates reports based on scientific literature queries using Scopus, Cohere, and Together AI. You can use the query to automatically extract data from Scopus, or provide a csv downloaded from Scopus.
 
 ## Installation
 
@@ -14,7 +14,7 @@ pip install git+https://github.com/DataGomes/ReportAI
 Before using the library, you need to set up your API keys. You can do this in two ways:
 
 1. Set environment variables:
-   - VOYAGE_API_KEY
+   - CO_API_KEY
    - TOGETHER_API_KEY
    - Pybliometrics will ask to set the api key using Scopus.
 2. Use the `set_api_keys()` function:
@@ -23,12 +23,12 @@ Before using the library, you need to set up your API keys. You can do this in t
 from report_generator import set_api_keys
 
 set_api_keys(
-    voyage_key="your_voyage_key",
+    cohere_key="your_cohere_key",
     together_key="your_together_key"
 )
 ```
 
-Ensure you have the necessary permissions and subscriptions for Scopus API, Voyage AI, and Together AI.
+Ensure you have the necessary permissions and subscriptions for Scopus API, Cohere, and Together AI.
 
 ## Usage
 
@@ -39,7 +39,7 @@ from report_generator import ReportAI, set_api_keys
 
 # Set your API keys
 set_api_keys(
-    voyage_key="your voyage key",
+    cohere_key="your cohere key",
     together_key="your together key"
 )
 
