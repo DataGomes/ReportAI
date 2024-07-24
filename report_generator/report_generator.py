@@ -128,7 +128,7 @@ class ReportAI:
     def refine_search(self, query: str, basis: str, csv_path: Optional[str] = None) -> Tuple[pd.DataFrame, Optional[str]]:
         if csv_path:
             df_scopus = pd.read_csv(csv_path)
-            df_scopus = df_scopus.rename(columns={'DOI': 'doi','Abstract': 'description','Title': 'title'})
+            df_scopus = df_scopus.rename(columns={'DOI': 'doi','Abstract': 'description','Title': 'title','Cited by':'citedby_count'})
             return df_scopus, None
         max_attempts = 5
         year = 2019
