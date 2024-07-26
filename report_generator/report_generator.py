@@ -334,16 +334,16 @@ class ReportAI:
         topics = topics.sort_values(by="Similarities", ascending=False)
 
         for index, row in topics.iterrows():
-            if row['Similarities'] < 0.35:
+            if row['Similarities'] < 0.4:
                 topics.at[index, 'Choice'] = 'N'
 
         n_indices = topics[topics['Choice'] == 'N'].index
 
         for idx in n_indices:
             current_min = topics[topics["Choice"] == 'Y']["Similarities"].min()
-            if current_min > 0.35:
-                current_min = 0.35
-            if current_min - topics.loc[idx, "Similarities"] <= 0.001 and topics.loc[idx, "Similarities"] > 0.3:
+            if current_min > 0.4:
+                current_min = 0.4
+            if current_min - topics.loc[idx, "Similarities"] <= 0.001 and topics.loc[idx, "Similarities"] > 0.35:
                 topics.loc[idx, "Choice"] = "Y"
 
         topics = topics.sort_values(by="Indexes", ascending=True)
