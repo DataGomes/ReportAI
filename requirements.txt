@@ -6,7 +6,7 @@ markdown2
 weasyprint
 python-dotenv
 together
-voyageai
+cohere
 ftfy
 scikit-learn
 umap-learn
