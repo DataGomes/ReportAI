@@ -203,7 +203,7 @@ class ReportAI:
             umap_model = UMAP(n_components=5, n_neighbors=15, min_dist=0.0, metric='cosine', low_memory=False, random_state = random_state)
             umap_embeddings = umap_model.fit_transform(embeddings)
 
-            ClusterSize = int(len(docs)/200)
+            ClusterSize = int(len(docs)/100)
             if ClusterSize < 10:
                 ClusterSize = 10
 
@@ -334,16 +334,16 @@ class ReportAI:
         topics = topics.sort_values(by="Similarities", ascending=False)
 
         for index, row in topics.iterrows():
-            if row['Similarities'] < 0.4:
+            if row['Similarities'] < 0.35:
                 topics.at[index, 'Choice'] = 'N'
 
         n_indices = topics[topics['Choice'] == 'N'].index
 
         for idx in n_indices:
             current_min = topics[topics["Choice"] == 'Y']["Similarities"].min()
-            if current_min > 0.4:
-                current_min = 0.4
-            if current_min - topics.loc[idx, "Similarities"] <= 0.001 and topics.loc[idx, "Similarities"] > 0.35:
+            if current_min > 0.35:
+                current_min = 0.35
+            if current_min - topics.loc[idx, "Similarities"] <= 0.001 and topics.loc[idx, "Similarities"] > 0.3:
                 topics.loc[idx, "Choice"] = "Y"
 
         topics = topics.sort_values(by="Indexes", ascending=True)
