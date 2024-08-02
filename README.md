@@ -30,6 +30,8 @@ set_api_keys(
 
 Ensure you have the necessary permissions and subscriptions for Scopus API, Cohere, and Together AI.
 
+To set up the Scopus API correctly using pybliometrics you can follow this tutorial: https://pybliometrics.readthedocs.io/en/stable/configuration.html
+
 ## Usage
 
 ### As a library
