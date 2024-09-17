@@ -49,7 +49,7 @@ set_api_keys(
 generator = ReportAI()
 
 # Generate a report
-query = "artificial intelligence in healthcare and genetics"
+query = "artificial intelligence in genetics"
 html_output, query, html_pdf = generator.run_report(query, output_dir="your output directory")
 
 if html_pdf == "failure":
