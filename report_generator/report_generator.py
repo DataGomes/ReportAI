@@ -291,7 +291,7 @@ class ReportAI:
                     {'role': 'system', 'content': 'You are an expert at creating topic labels. In this task, you will be provided with a set of keywords related to ONE particular topic. Your job is to use these keywords, prioritizing the first keywords, to come up with an accurate and short label for the topic. It is crucial that you base your label STRICLY on the keywords.'},
                     {'role': 'user', 'content': prompt},
                 ],
-                model="meta-llama/Llama-3-70b-chat-hf",
+                model="mistralai/Mixtral-8x22B-Instruct-v0.1",
                 temperature=0,
             )
             response_content = response.choices[0].message.content
@@ -452,7 +452,7 @@ class ReportAI:
                 {'role': 'system', 'content': f'You are a scientist working on a project about scientific abstracts related to the topic: {theme}. You are an expert at writing summaries based upon abstracts. You DO NOT use information outside of the provided text. You are a scientific abstract summarizer, so the summary must be based ONLY on the provided text. Answer directly about the topic: {theme}, DO NOT tell this is the summary or use the word "summary" or "abstract" in your response.'},
                 {'role': 'user', 'content': query},
             ],
-            model="meta-llama/Llama-3-70b-chat-hf",
+            model="mistralai/Mixtral-8x22B-Instruct-v0.1",
             temperature=0,
         )
         return response.choices[0].message.content
