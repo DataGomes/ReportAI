@@ -1,6 +1,6 @@
 # Report Generator
 
-This library generates reports based on scientific literature queries using Scopus, Cohere, and Mistral. You can use the query to automatically extract data from Scopus, or provide a csv downloaded from Scopus.
+This library generates reports based on scientific literature queries using Scopus, Cohere, and Together. You can use the query to automatically extract data from Scopus, or provide a csv downloaded from Scopus.
 
 ## Installation
 
